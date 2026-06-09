@@ -3,7 +3,7 @@ name: SWARAMA Agent System
 on:
   push:
     branches:
-      - main
+      - master
   schedule:
     # Every 2 hours
     - cron: "0 */2 * * *"
