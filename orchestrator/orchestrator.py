@@ -313,7 +313,10 @@ async def main():
 
     elif args.mode == "continuous":
         # In continuous mode, start the APScheduler-based runner
-        from orchestrator.scheduler import start_scheduler
+        try:
+            from orchestrator.scheduler import start_scheduler
+        except ImportError:
+            from scheduler import start_scheduler
         start_scheduler()
 
 
