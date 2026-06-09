@@ -1,0 +1,40 @@
+# SWARAMA — Agent Target URLs
+# Agents read this file to discover all endpoints. No URLs are hardcoded in agent code.
+
+backend_url: "${BACKEND_URL}"
+user_app_api: "${BACKEND_URL}/api"
+mechanic_api: "${BACKEND_URL}/mechanic"
+admin_api: "${BACKEND_URL}/admin"
+supabase_url: "${SUPABASE_URL}"
+supabase_key: "${SUPABASE_ANON_KEY}"
+
+# Individual endpoint paths (relative to backend_url)
+endpoints:
+  - name: services
+    path: /api/services
+    method: GET
+    auth: false
+  - name: bookings_list
+    path: /api/bookings
+    method: GET
+    auth: true
+  - name: bookings_create
+    path: /api/bookings
+    method: POST
+    auth: true
+  - name: mechanics_nearby
+    path: /api/mechanics/nearby
+    method: GET
+    auth: true
+  - name: admin_stats
+    path: /admin/stats
+    method: GET
+    auth: true
+  - name: mechanic_profile
+    path: /mechanic/profile
+    method: GET
+    auth: true
+  - name: health_check
+    path: /health
+    method: GET
+    auth: false

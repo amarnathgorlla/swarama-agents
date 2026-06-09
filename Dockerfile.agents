@@ -1,0 +1,36 @@
+# ============================================================
+# Dockerfile.agents — SWARAMA Agent System
+# ============================================================
+# Builds a minimal Python 3.11 image containing only the
+# agents/ directory. Does NOT include any other app folder.
+# ============================================================
+
+FROM python:3.11-slim
+
+# System dependencies for httpx / SSL
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    ca-certificates \
+    curl \
+    && rm -rf /var/lib/apt/lists/*
+
+# Working directory inside the container
+WORKDIR /app
+
+# Copy requirements first (layer cache optimisation)
+COPY agents/requirements.txt ./requirements.txt
+
+# Install Python dependencies
+RUN pip install --no-cache-dir -r requirements.txt
+
+# Copy only the agents/ folder — nothing else from the repo
+COPY agents/ ./agents/
+
+# Create runtime directories
+RUN mkdir -p /app/agents/logs /app/agents/reports /app/agents/testing/regression
+
+# Set Python path so all agent imports resolve correctly
+ENV PYTHONPATH=/app
+
+# Default mode: continuous (runs scheduler indefinitely)
+# Override with --mode=push-trigger for one-shot CI runs
+CMD ["python", "agents/orchestrator/orchestrator.py", "--mode=continuous"]

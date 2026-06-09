@@ -1,0 +1,122 @@
+name: SWARAMA Agent System
+
+on:
+  push:
+    branches:
+      - main
+  schedule:
+    # Every 2 hours
+    - cron: "0 */2 * * *"
+  workflow_dispatch:
+    inputs:
+      mode:
+        description: "Run mode: push-trigger | continuous | monitoring-only"
+        required: false
+        default: "push-trigger"
+
+env:
+  PYTHON_VERSION: "3.11"
+
+jobs:
+  run-agents:
+    name: Run SWARAMA Agents
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    steps:
+      # -----------------------------------------------------------------------
+      # 1. Checkout
+      # -----------------------------------------------------------------------
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      # -----------------------------------------------------------------------
+      # 2. Set up Python
+      # -----------------------------------------------------------------------
+      - name: Set up Python ${{ env.PYTHON_VERSION }}
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+          cache: "pip"
+          cache-dependency-path: agents/requirements.txt
+
+      # -----------------------------------------------------------------------
+      # 3. Install dependencies
+      # -----------------------------------------------------------------------
+      - name: Install agent dependencies
+        run: pip install -r agents/requirements.txt
+
+      # -----------------------------------------------------------------------
+      # 4. Create required directories
+      # -----------------------------------------------------------------------
+      - name: Create logs and reports directories
+        run: |
+          mkdir -p agents/logs
+          mkdir -p agents/reports
+          mkdir -p agents/testing/regression
+
+      # -----------------------------------------------------------------------
+      # 5. Write .env.agents from GitHub secrets
+      # -----------------------------------------------------------------------
+      - name: Write .env.agents
+        run: |
+          cat > agents/config/.env.agents << EOF
+          SUPABASE_URL=${{ secrets.SUPABASE_URL }}
+          SUPABASE_ANON_KEY=${{ secrets.SUPABASE_ANON_KEY }}
+          GMAIL_USER=${{ secrets.GMAIL_USER }}
+          GMAIL_APP_PASSWORD=${{ secrets.GMAIL_APP_PASSWORD }}
+          GITHUB_TOKEN=${{ secrets.AGENT_GITHUB_TOKEN }}
+          GITHUB_REPO=${{ github.repository }}
+          BACKEND_URL=${{ secrets.BACKEND_URL }}
+          ALERT_EMAIL=gvamarnath100@gmail.com
+          ENV=ci
+          EOF
+
+      # -----------------------------------------------------------------------
+      # 6. Run agents — push-trigger mode on push, else monitoring
+      # -----------------------------------------------------------------------
+      - name: Run agents (push trigger)
+        if: github.event_name == 'push'
+        run: python agents/orchestrator/orchestrator.py --mode=push-trigger
+        env:
+          PYTHONPATH: ${{ github.workspace }}
+
+      - name: Run agents (scheduled / manual)
+        if: github.event_name != 'push'
+        run: python agents/orchestrator/orchestrator.py --mode=${{ github.event.inputs.mode || 'monitoring-only' }}
+        env:
+          PYTHONPATH: ${{ github.workspace }}
+
+      # -----------------------------------------------------------------------
+      # 7. Upload reports as artifacts
+      # -----------------------------------------------------------------------
+      - name: Upload agent reports
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: swarama-agent-reports-${{ github.run_number }}
+          path: |
+            agents/reports/
+            agents/logs/
+          retention-days: 30
+
+      # -----------------------------------------------------------------------
+      # 8. Upload logs on failure
+      # -----------------------------------------------------------------------
+      - name: Upload logs on failure
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: swarama-failure-logs-${{ github.run_number }}
+          path: agents/logs/agent.log
+          retention-days: 7
+
+      # -----------------------------------------------------------------------
+      # 9. Notify on workflow failure (GitHub Actions built-in)
+      # -----------------------------------------------------------------------
+      - name: Notify on failure
+        if: failure()
+        run: |
+          echo "::error::SWARAMA agent workflow failed! Check logs artifact for details."
+          echo "::notice::Run number: ${{ github.run_number }}"
+          echo "::notice::Triggered by: ${{ github.event_name }}"

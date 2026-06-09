@@ -1,0 +1,31 @@
+# docker-compose for SWARAMA Agent System
+# Add the `agents` service below to your existing docker-compose.yml.
+# The swarama-network must already be defined in your main docker-compose.yml.
+#
+# To use as standalone:
+#   docker-compose -f agents/docker-compose.agents.yml up -d
+#
+# To merge with existing docker-compose.yml, copy the `agents` service block.
+
+version: "3.9"
+
+services:
+  agents:
+    build:
+      context: ..
+      dockerfile: agents/Dockerfile.agents
+    container_name: swarama-agents
+    env_file: ./config/.env.agents
+    volumes:
+      - ./logs:/app/agents/logs
+      - ./reports:/app/agents/reports
+    restart: unless-stopped
+    # Remove the `networks` block if your main docker-compose doesn't define swarama-network
+    networks:
+      - swarama-network
+
+networks:
+  swarama-network:
+    external: true
+    # If swarama-network doesn't exist yet, change `external: true` to:
+    # driver: bridge

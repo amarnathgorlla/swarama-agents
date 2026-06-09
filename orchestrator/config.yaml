@@ -1,0 +1,58 @@
+# SWARAMA Orchestrator Configuration
+
+# Agent execution settings
+parallel_testing: true
+fail_fast: false           # continue running other agents even if one fails
+critical_fail_threshold: 3 # number of FAIL agents before escalating to CRITICAL
+
+# Retry settings
+agent_retry_count: 2
+agent_retry_delay_s: 5
+
+# Timeouts
+agent_timeout_s: 120       # kill any agent that hangs longer than this
+
+# Report settings
+report_dir: agents/reports
+log_file: agents/logs/agent.log
+log_level: INFO
+
+# GitHub integration
+github_owner: your_github_username
+github_repo: mechbook-app
+github_workflow_id: run-agents.yml
+
+# Testing agents (run on push trigger)
+testing_agents:
+  - qa_agent
+  - logic_agent
+  - regression_agent
+  - integration_agent
+  - load_agent
+  - latency_agent
+  - db_query_agent
+
+# Monitoring agents (run every 2 hours)
+monitoring_agents:
+  - health_monitor
+  - uptime_agent
+  - security_agent
+  - auth_agent
+  - analytics_agent
+  - data_integrity_agent
+
+# Analysis agents (triggered by failures)
+analysis_agents:
+  - log_analysis_agent
+  - root_cause_agent
+  - auto_fix_agent
+
+# Reporting agents
+reporting_agents:
+  - report_agent
+  - email_notifier
+
+# Daily agents (24h schedule)
+daily_agents:
+  - trend_agent
+  - postmortem_agent

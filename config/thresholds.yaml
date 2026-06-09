@@ -1,0 +1,39 @@
+# SWARAMA — Agent Pass/Fail Thresholds
+# All agents compare their measurements against these values.
+
+# Response time thresholds (milliseconds)
+max_response_time_ms: 2000
+max_db_query_ms: 500
+latency_p95_ms: 1500
+latency_p99_ms: 2500
+
+# Reliability thresholds
+max_error_rate_percent: 5
+min_uptime_percent: 99
+min_load_success_rate_percent: 95
+
+# Load test parameters
+load_concurrent_requests: 50
+load_test_endpoint: /api/bookings
+
+# Latency test parameters
+latency_ping_count: 10
+
+# Data integrity thresholds
+max_unassigned_booking_minutes: 10
+max_duplicate_booking_window_minutes: 30
+
+# Log analysis thresholds
+error_spike_threshold_per_hour: 10
+
+# Scheduling
+check_interval_hours: 2
+trend_analysis_days: 7
+postmortem_hour: 0  # midnight
+
+# Alert destination
+alert_email: gvamarnath100@gmail.com
+
+# Chaos agent settings
+chaos_slow_response_timeout_s: 5
+chaos_only_in_env: staging
