@@ -13,6 +13,15 @@ on:
         description: "Run mode: push-trigger | continuous | monitoring-only"
         required: false
         default: "push-trigger"
+      sha:
+        description: "Commit SHA to run agents at (for rollbacks)"
+        required: false
+      reason:
+        description: "Reason for rollback/trigger"
+        required: false
+      triggered_by:
+        description: "Agent or user who triggered this"
+        required: false
 
 env:
   PYTHON_VERSION: "3.11"
@@ -29,6 +38,8 @@ jobs:
       # -----------------------------------------------------------------------
       - name: Checkout repository
         uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.inputs.sha || github.sha }}
 
       # -----------------------------------------------------------------------
       # 2. Set up Python
