@@ -20,7 +20,7 @@ from dotenv import load_dotenv
 # ---------------------------------------------------------------------------
 # Load environment
 # ---------------------------------------------------------------------------
-_ENV_PATH = Path(__file__).resolve().parents[2] / "config" / ".env.agents"
+_ENV_PATH = Path(__file__).resolve().parents[1] / "config" / ".env.agents"
 load_dotenv(_ENV_PATH)
 
 GMAIL_USER = os.getenv("GMAIL_USER", "")

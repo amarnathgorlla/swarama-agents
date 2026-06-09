@@ -22,12 +22,12 @@ from dotenv import load_dotenv
 # ---------------------------------------------------------------------------
 # Load environment
 # ---------------------------------------------------------------------------
-_ENV_PATH = Path(__file__).resolve().parents[2] / "config" / ".env.agents"
+_ENV_PATH = Path(__file__).resolve().parents[1] / "config" / ".env.agents"
 load_dotenv(_ENV_PATH)
 
 GITHUB_TOKEN = os.getenv("GITHUB_TOKEN", "")
 GITHUB_REPO = os.getenv("GITHUB_REPO", "your-org/swarama")  # owner/repo
-GITHUB_WORKFLOW_ID = os.getenv("GITHUB_ROLLBACK_WORKFLOW", "deploy.yml")
+GITHUB_WORKFLOW_ID = os.getenv("GITHUB_ROLLBACK_WORKFLOW", "run-agents.yml")
 GMAIL_USER = os.getenv("GMAIL_USER", "")
 GMAIL_APP_PASSWORD = os.getenv("GMAIL_APP_PASSWORD", "")
 ALERT_EMAIL = os.getenv("ALERT_EMAIL", "gvamarnath100@gmail.com")
@@ -45,43 +45,44 @@ def _github_headers() -> dict:
     }
 
 
-async def _get_last_successful_sha(client: httpx.AsyncClient) -> tuple[str | None, str | None]:
+async def _get_last_successful_sha(client: httpx.AsyncClient) -> tuple[str | None, str | None, str | None]:
     """
-    Find the SHA of the last successful deployment on main branch.
-    Returns (sha, run_url) or (None, None) if not found.
+    Find the SHA of the last successful deployment on main or master branch.
+    Returns (sha, run_url, branch) or (None, None, None) if not found.
     """
-    url = f"{GITHUB_API}/repos/{GITHUB_REPO}/actions/runs"
-    params = {
-        "branch": "main",
-        "status": "success",
-        "per_page": 10,
-    }
-    try:
-        resp = await client.get(url, headers=_github_headers(), params=params, timeout=20)
-        resp.raise_for_status()
-        runs = resp.json().get("workflow_runs", [])
+    for branch in ["main", "master"]:
+        url = f"{GITHUB_API}/repos/{GITHUB_REPO}/actions/runs"
+        params = {
+            "branch": branch,
+            "status": "success",
+            "per_page": 10,
+        }
+        try:
+            resp = await client.get(url, headers=_github_headers(), params=params, timeout=20)
+            resp.raise_for_status()
+            runs = resp.json().get("workflow_runs", [])
 
-        if not runs:
-            logger.warning("[rollback_agent] No successful workflow runs found on main")
-            return None, None
+            if not runs:
+                logger.warning(f"[rollback_agent] No successful workflow runs found on branch: {branch}")
+                continue
 
-        # Find the most recent successful run (skip the current broken one — take the second)
-        for run in runs:
-            sha = run.get("head_sha")
-            run_url = run.get("html_url")
-            run_id = run.get("id")
-            if sha:
-                logger.info("[rollback_agent] Found last successful SHA: %s (run #%s)", sha, run_id)
-                return sha, run_url
+            # Find the most recent successful run (skip the current broken one — take the second)
+            for run in runs:
+                sha = run.get("head_sha")
+                run_url = run.get("html_url")
+                run_id = run.get("id")
+                if sha:
+                    logger.info("[rollback_agent] Found last successful SHA on %s: %s (run #%s)", branch, sha, run_id)
+                    return sha, run_url, branch
 
-    except Exception as exc:
-        logger.error("[rollback_agent] Failed to fetch workflow runs: %s", exc)
+        except Exception as exc:
+            logger.error("[rollback_agent] Failed to fetch workflow runs for branch %s: %s", branch, exc)
 
-    return None, None
+    return None, None, None
 
 
 async def _trigger_rollback_workflow(
-    client: httpx.AsyncClient, sha: str, reason: str
+    client: httpx.AsyncClient, sha: str, reason: str, branch: str
 ) -> tuple[bool, str]:
     """
     Trigger a GitHub Actions workflow_dispatch event with the target SHA as input.
@@ -89,7 +90,7 @@ async def _trigger_rollback_workflow(
     """
     url = f"{GITHUB_API}/repos/{GITHUB_REPO}/actions/workflows/{GITHUB_WORKFLOW_ID}/dispatches"
     payload = {
-        "ref": "main",
+        "ref": branch,
         "inputs": {
             "sha": sha,
             "reason": reason,
@@ -99,7 +100,7 @@ async def _trigger_rollback_workflow(
     try:
         resp = await client.post(url, json=payload, headers=_github_headers(), timeout=20)
         if resp.status_code == 204:
-            return True, f"Workflow dispatch triggered successfully for SHA {sha}"
+            return True, f"Workflow dispatch triggered successfully for SHA {sha} on branch {branch}"
         return False, f"Workflow dispatch returned HTTP {resp.status_code}: {resp.text[:200]}"
     except Exception as exc:
         return False, f"Workflow dispatch exception: {exc}"
@@ -193,14 +194,14 @@ async def run(
 
     async with httpx.AsyncClient(follow_redirects=True) as client:
         # Step 1: Find last successful SHA
-        sha, run_url = await _get_last_successful_sha(client)
+        sha, run_url, branch = await _get_last_successful_sha(client)
 
-        if not sha:
+        if not sha or not branch:
             workflow_msg = "No successful GitHub Actions run found — cannot determine rollback target"
             logger.error("[%s] %s", agent_name, workflow_msg)
         else:
             # Step 2: Trigger rollback workflow
-            rollback_triggered, workflow_msg = await _trigger_rollback_workflow(client, sha, reason)
+            rollback_triggered, workflow_msg = await _trigger_rollback_workflow(client, sha, reason, branch)
             logger.info("[%s] Rollback result: %s", agent_name, workflow_msg)
 
     # Step 3: Send CRITICAL email immediately (regardless of rollback success)
