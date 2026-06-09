@@ -21,6 +21,7 @@ import yaml
 from dotenv import load_dotenv
 
 load_dotenv(Path(__file__).resolve().parent.parent / "config" / ".env.agents")
+AGENT_SECRET = os.getenv("AGENT_SECRET")
 
 CONFIG_DIR = Path(__file__).resolve().parent.parent / "config"
 with open(CONFIG_DIR / "targets.yaml") as f:
@@ -45,7 +46,7 @@ async def _get_first_service(client: httpx.AsyncClient) -> dict | None:
         r = await client.get(f"{BACKEND}/api/services", timeout=10)
         if r.status_code == 200:
             data = r.json()
-            items = data if isinstance(data, list) else data.get("data", [])
+            items = data if isinstance(data, list) else (data.get("services") or data.get("data", []))
             return items[0] if items else None
     except Exception:
         pass
@@ -70,14 +71,16 @@ async def _test_booking_flow(client: httpx.AsyncClient, failures: list) -> dict:
     booking_payload = {
         "service_id": service_id,
         "user_id": f"logic-test-{uuid.uuid4().hex[:8]}",
-        "location": {"lat": TEST_LAT, "lng": TEST_LNG},
+        "user_lat": TEST_LAT,
+        "user_lng": TEST_LNG,
+        "vehicle_type": "bike",
         "notes": "Logic agent test — auto-generated, please ignore",
     }
     try:
         r = await client.post(
             f"{BACKEND}/api/bookings",
             json=booking_payload,
-            headers={"Authorization": "Bearer logic-agent-test"},
+            headers={"Authorization": "Bearer mock-logic-agent-test"},
             timeout=MAX_MS / 1000 + 2,
         )
         steps["create_booking"] = {
@@ -111,9 +114,9 @@ async def _test_booking_flow(client: httpx.AsyncClient, failures: list) -> dict:
 
         # Step 4: Status change — accept booking
         r2 = await client.patch(
-            f"{BACKEND}/api/bookings/{booking_id}/status",
-            json={"status": "accepted"},
-            headers={"Authorization": "Bearer logic-agent-test"},
+            f"{BACKEND}/api/bookings/{booking_id}",
+            json={"status": "confirmed"},
+            headers={"Authorization": "Bearer mock-logic-agent-test"},
             timeout=10,
         )
         steps["status_accept"] = {
@@ -123,9 +126,9 @@ async def _test_booking_flow(client: httpx.AsyncClient, failures: list) -> dict:
 
         # Step 5: Cancel booking
         r3 = await client.patch(
-            f"{BACKEND}/api/bookings/{booking_id}/status",
+            f"{BACKEND}/api/bookings/{booking_id}",
             json={"status": "cancelled"},
-            headers={"Authorization": "Bearer logic-agent-test"},
+            headers={"Authorization": "Bearer mock-logic-agent-test"},
             timeout=10,
         )
         steps["cancel_booking"] = {
@@ -136,7 +139,7 @@ async def _test_booking_flow(client: httpx.AsyncClient, failures: list) -> dict:
         # Step 6: Verify cancellation
         r4 = await client.get(
             f"{BACKEND}/api/bookings/{booking_id}",
-            headers={"Authorization": "Bearer logic-agent-test"},
+            headers={"Authorization": "Bearer mock-logic-agent-test"},
             timeout=10,
         )
         steps["verify_cancellation"] = {
@@ -164,7 +167,7 @@ async def _test_mechanic_dispatch(client: httpx.AsyncClient, failures: list) -> 
         r = await client.get(
             f"{BACKEND}/api/mechanics/nearby",
             params={"lat": TEST_LAT, "lng": TEST_LNG, "radius": 10},
-            headers={"Authorization": "Bearer logic-agent-test"},
+            headers={"Authorization": "Bearer mock-logic-agent-test"},
             timeout=MAX_MS / 1000 + 2,
         )
         if r.status_code == 200:
@@ -196,7 +199,11 @@ async def run(system_state: dict | None = None, **kwargs) -> dict:
     failures = []
     details = {}
 
-    async with httpx.AsyncClient(follow_redirects=True) as client:
+    client_headers = {}
+    if AGENT_SECRET:
+      client_headers["x-agent-secret"] = AGENT_SECRET
+
+    async with httpx.AsyncClient(headers=client_headers, follow_redirects=True) as client:
         booking_steps = await _test_booking_flow(client, failures)
         dispatch_result = await _test_mechanic_dispatch(client, failures)
 

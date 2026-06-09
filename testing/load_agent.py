@@ -35,15 +35,20 @@ MIN_SUCCESS_RATE = THRESHOLDS.get("min_load_success_rate_percent", 95)
 CONCURRENT = THRESHOLDS.get("load_concurrent_requests", 50)
 
 LOAD_PAYLOAD = {
-    "service_id": "load-test-service",
-    "location": {"lat": 12.9716, "lng": 77.5946},
+    "service_id": 1,
+    "user_lat": 12.9716,
+    "user_lng": 77.5946,
+    "vehicle_type": "bike",
     "notes": "Load agent test — auto-generated, please ignore",
 }
+AGENT_SECRET = os.getenv("AGENT_SECRET")
 LOAD_HEADERS = {
     "Content-Type": "application/json",
-    "Authorization": "Bearer load-agent-test",
+    "Authorization": "Bearer mock-load-agent-test",
     "X-Agent": "swarama-load-agent",
 }
+if AGENT_SECRET:
+    LOAD_HEADERS["x-agent-secret"] = AGENT_SECRET
 
 
 async def _single_request(client: httpx.AsyncClient, req_id: int) -> dict:

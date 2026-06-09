@@ -59,23 +59,39 @@ async def run(system_state: dict | None = None, **kwargs) -> dict:
     all_steps: list[Step] = []
     context = {}  # shared data between steps
 
+    AGENT_SECRET = os.getenv("AGENT_SECRET")
     headers = {
         "Content-Type": "application/json",
-        "Authorization": "Bearer integration-agent-test",
+        "Authorization": "Bearer mock-integration-agent-test",
     }
+    if AGENT_SECRET:
+        headers["x-agent-secret"] = AGENT_SECRET
 
     async with httpx.AsyncClient(follow_redirects=True, timeout=15) as client:
+        # Fetch first valid service ID
+        service_id = 1
+        try:
+            r = await client.get(f"{BACKEND}/api/services", headers=headers, timeout=10)
+            if r.status_code == 200:
+                data = r.json()
+                items = data if isinstance(data, list) else (data.get("services") or data.get("data", []))
+                if items:
+                    service_id = items[0].get("id", 1)
+        except Exception:
+            pass
 
         # ── Step 1: Create user ────────────────────────────────────────────────
         step = Step("create_user")
         try:
             r = await client.post(
-                f"{BACKEND}/api/auth/register",
+                f"{BACKEND}/api/auth/register-user",
                 json={
                     "email": f"integration-test-{TEST_ID}@swarama-test.dev",
                     "password": "Test@1234!",
                     "name": "Integration Test User",
                     "phone": "+919999999999",
+                    "vehicle_type": "bike",
+                    "vehicle_number": "KA-01-AB-1234",
                 },
                 headers=headers,
             )
@@ -107,8 +123,10 @@ async def run(system_state: dict | None = None, **kwargs) -> dict:
             # Cannot continue without user
             return _build_result(t0, all_steps, steps_passed, steps_failed, "create_user")
 
-        steps_passed.append(step.name)
-        auth_headers = {**headers, "Authorization": f"Bearer {context['token']}"}
+        tok = context['token']
+        if tok.startswith("Bearer "):
+            tok = tok.split("Bearer ")[1]
+        auth_headers = {**headers, "Authorization": f"Bearer {tok}"}
 
         # ── Step 2: Create booking ─────────────────────────────────────────────
         step = Step("create_booking")
@@ -116,9 +134,11 @@ async def run(system_state: dict | None = None, **kwargs) -> dict:
             r = await client.post(
                 f"{BACKEND}/api/bookings",
                 json={
-                    "service_id": "integration-test-service",
+                    "service_id": service_id,
                     "user_id": context["user_id"],
-                    "location": {"lat": 12.9716, "lng": 77.5946},
+                    "user_lat": 12.9716,
+                    "user_lng": 77.5946,
+                    "vehicle_type": "bike",
                     "notes": f"Integration test {TEST_ID} — auto-generated",
                 },
                 headers=auth_headers,
@@ -171,8 +191,8 @@ async def run(system_state: dict | None = None, **kwargs) -> dict:
         step = Step("status_arrived")
         try:
             r = await client.patch(
-                f"{BACKEND}/api/bookings/{booking_id}/status",
-                json={"status": "arrived"},
+                f"{BACKEND}/api/bookings/{booking_id}",
+                json={"status": "confirmed"},
                 headers=auth_headers,
             )
             step.status_code = r.status_code
@@ -183,13 +203,13 @@ async def run(system_state: dict | None = None, **kwargs) -> dict:
             step.passed = True
         all_steps.append(step)
         steps_passed.append(step.name) if step.passed else steps_failed.append({"step": step.name, "reason": step.note})
-
+ 
         # ── Step 5: Complete booking ───────────────────────────────────────────
         step = Step("complete_booking")
         try:
             r = await client.patch(
-                f"{BACKEND}/api/bookings/{booking_id}/status",
-                json={"status": "completed"},
+                f"{BACKEND}/api/bookings/{booking_id}",
+                json={"status": "done"},
                 headers=auth_headers,
             )
             step.status_code = r.status_code

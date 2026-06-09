@@ -20,6 +20,7 @@ import yaml
 from dotenv import load_dotenv
 
 load_dotenv(Path(__file__).resolve().parent.parent / "config" / ".env.agents")
+AGENT_SECRET = os.getenv("AGENT_SECRET")
 
 CONFIG_DIR = Path(__file__).resolve().parent.parent / "config"
 with open(CONFIG_DIR / "targets.yaml") as f:
@@ -39,7 +40,7 @@ PING_COUNT = THRESHOLDS.get("latency_ping_count", 10)
 ENDPOINTS_TO_PING = [
     {"name": "health", "url": f"{BACKEND}/health", "method": "get", "auth": False},
     {"name": "services", "url": f"{BACKEND}/api/services", "method": "get", "auth": False},
-    {"name": "bookings", "url": f"{BACKEND}/api/bookings", "method": "get", "auth": True},
+    {"name": "bookings", "url": f"{BACKEND}/api/bookings/user/history", "method": "get", "auth": True},
     {"name": "mechanics_nearby", "url": f"{BACKEND}/api/mechanics/nearby", "method": "get", "auth": True, "params": {"lat": "12.9716", "lng": "77.5946"}},
 ]
 
@@ -56,8 +57,10 @@ async def _ping_endpoint(client: httpx.AsyncClient, endpoint: dict) -> list[floa
     """Ping an endpoint PING_COUNT times, return list of response times in ms."""
     times = []
     headers = {}
+    if AGENT_SECRET:
+        headers["x-agent-secret"] = AGENT_SECRET
     if endpoint.get("auth"):
-        headers["Authorization"] = "Bearer latency-agent-test"
+        headers["Authorization"] = "Bearer mock-latency-agent-test"
 
     for _ in range(PING_COUNT):
         t0 = time.monotonic()

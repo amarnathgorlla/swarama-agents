@@ -21,6 +21,7 @@ import yaml
 from dotenv import load_dotenv
 
 load_dotenv(Path(__file__).resolve().parent.parent / "config" / ".env.agents")
+AGENT_SECRET = os.getenv("AGENT_SECRET")
 
 CONFIG_DIR = Path(__file__).resolve().parent.parent / "config"
 with open(CONFIG_DIR / "targets.yaml") as f:
@@ -48,7 +49,7 @@ SCHEMA_CHECKS: dict[str, dict] = {
     },
     "GET /api/bookings": {
         "method": "GET",
-        "url": f"{BACKEND}/api/bookings",
+        "url": f"{BACKEND}/api/bookings/user/history",
         "auth": True,
         "expected_status": [200, 401],  # 401 acceptable without real token
         "required_fields": [],
@@ -60,8 +61,10 @@ SCHEMA_CHECKS: dict[str, dict] = {
         "auth": True,
         "expected_status": [200, 201, 400, 401, 422],
         "body": {
-            "service_id": "test-service-id",
-            "location": {"lat": 12.9716, "lng": 77.5946},
+            "service_id": 1,
+            "user_lat": 12.9716,
+            "user_lng": 77.5946,
+            "vehicle_type": "bike",
             "notes": "QA agent test booking — ignore",
         },
         "required_fields": [],
@@ -95,13 +98,16 @@ async def _test_endpoint(
     status_code = None
 
     try:
+        headers = {"Content-Type": "application/json"}
+        if AGENT_SECRET:
+            headers["x-agent-secret"] = AGENT_SECRET
+        if spec.get("auth"):
+            headers["Authorization"] = "Bearer mock-qa-agent-test-token"
+
         kwargs: dict[str, Any] = {
-            "headers": {"Content-Type": "application/json"},
+            "headers": headers,
             "timeout": MAX_MS / 1000 + 1,
         }
-        if spec.get("auth"):
-            # Use a dummy bearer token — we're just checking the endpoint shape
-            kwargs["headers"]["Authorization"] = "Bearer qa-agent-test-token"
         if spec.get("params"):
             kwargs["params"] = spec["params"]
         if spec.get("body"):
@@ -138,7 +144,7 @@ async def _test_endpoint(
                 if spec.get("is_list") and not isinstance(body, list):
                     # Some backends wrap in {data: []}
                     if isinstance(body, dict) and any(
-                        isinstance(body.get(k), list) for k in ["data", "results", "items"]
+                        isinstance(body.get(k), list) for k in ["data", "results", "items", "services", "mechanics", "bookings"]
                     ):
                         pass  # wrapped list is fine
                     else:

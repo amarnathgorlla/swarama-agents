@@ -21,6 +21,7 @@ import yaml
 from dotenv import load_dotenv
 
 load_dotenv(Path(__file__).resolve().parent.parent / "config" / ".env.agents")
+AGENT_SECRET = os.getenv("AGENT_SECRET")
 
 CONFIG_DIR = Path(__file__).resolve().parent.parent / "config"
 with open(CONFIG_DIR / "targets.yaml") as f:
@@ -88,13 +89,16 @@ async def _test_malformed_json(client: httpx.AsyncClient) -> dict:
     for endpoint in POST_ENDPOINTS:
         for payload in MALFORMED_PAYLOADS:
             try:
+                headers = {
+                    "Content-Type": "application/json",
+                    "Authorization": "Bearer mock-chaos-agent-test",
+                }
+                if AGENT_SECRET:
+                    headers["x-agent-secret"] = AGENT_SECRET
                 r = await client.post(
                     endpoint,
                     content=payload,
-                    headers={
-                        "Content-Type": "application/json",
-                        "Authorization": "Bearer chaos-agent-test",
-                    },
+                    headers=headers,
                     timeout=10,
                 )
                 if r.status_code == 500:

@@ -175,8 +175,10 @@ SAFE_FIXES: dict[str, list] = {
 
 
 async def run(
-    root_cause_result: dict,
-    failure_dict: dict,
+    root_cause_result: dict | None = None,
+    failure_dict: dict | None = None,
+    root_cause: dict | None = None,
+    failures: list[dict] | None = None,
     system_state: dict | None = None,
 ) -> dict:
     """
@@ -185,6 +187,8 @@ async def run(
     Args:
         root_cause_result: Output from root_cause_agent.run().
         failure_dict: The original failing agent's result dict.
+        root_cause: Optional alias for root_cause_result from orchestrator.
+        failures: Optional list of failure dicts from orchestrator.
         system_state: Optional shared orchestrator state.
 
     Returns:
@@ -193,6 +197,14 @@ async def run(
     start = time.monotonic()
     agent_name = "auto_fix_agent"
     timestamp = datetime.now(timezone.utc).isoformat()
+
+    if root_cause_result is None:
+        root_cause_result = root_cause or {}
+    if failure_dict is None:
+        if failures and len(failures) > 0:
+            failure_dict = failures[0]
+        else:
+            failure_dict = {}
 
     details = root_cause_result.get("details", {})
     pattern = details.get("pattern_matched", "none")

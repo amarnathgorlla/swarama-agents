@@ -67,7 +67,7 @@ async def _query_table(client: httpx.AsyncClient, table: str) -> dict:
         )
         query_ms = int((time.monotonic() - t0) * 1000)
 
-        if r.status_code == 200:
+        if r.status_code in (200, 206):
             # Supabase returns count in Content-Range header: "0-0/42"
             content_range = r.headers.get("content-range", "")
             row_count = None

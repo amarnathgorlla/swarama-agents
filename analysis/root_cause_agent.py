@@ -164,12 +164,17 @@ def _build_failure_text(failure_dict: dict) -> str:
     return " ".join(parts)
 
 
-async def run(failure_dict: dict, system_state: dict | None = None) -> dict:
+async def run(
+    failure_dict: dict | None = None,
+    failures: list[dict] | None = None,
+    system_state: dict | None = None,
+) -> dict:
     """
     Analyse a failure dict and return the most likely root cause.
 
     Args:
         failure_dict: The dict returned by the failing agent.
+        failures: Optional list of failure dicts from orchestrator.
         system_state: Optional shared orchestrator state for additional context.
 
     Returns:
@@ -178,6 +183,12 @@ async def run(failure_dict: dict, system_state: dict | None = None) -> dict:
     start = time.monotonic()
     agent_name = "root_cause_agent"
     timestamp = datetime.now(timezone.utc).isoformat()
+
+    if failure_dict is None:
+        if failures and len(failures) > 0:
+            failure_dict = failures[0]
+        else:
+            failure_dict = {}
 
     logger.info("[%s] Starting root cause analysis for failure from agent: %s",
                 agent_name, failure_dict.get("agent", "unknown"))

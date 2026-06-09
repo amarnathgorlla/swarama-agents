@@ -128,7 +128,7 @@ def _build_plain_text_summary(report: dict) -> str:
 
 
 async def run(
-    agent_results: list[dict],
+    agent_results: list[dict] | None = None,
     run_start_time: float | None = None,
     system_state: dict | None = None,
 ) -> dict:
@@ -146,6 +146,12 @@ async def run(
     start = time.monotonic()
     agent_name = "report_agent"
     timestamp_str = datetime.now(timezone.utc).isoformat()
+
+    if agent_results is None:
+        if system_state and "results" in system_state:
+            agent_results = list(system_state["results"].values())
+        else:
+            agent_results = []
 
     if run_start_time is None:
         run_start_time = start
@@ -198,8 +204,9 @@ if __name__ == "__main__":
 
     import asyncio
 
+    timestamp_str = datetime.now(timezone.utc).isoformat()
     fake_results = [
-        {"agent": "qa_agent", "status": "PASS", "timestamp": timestamp_str := datetime.now(timezone.utc).isoformat(), "duration_ms": 312, "details": {}},
+        {"agent": "qa_agent", "status": "PASS", "timestamp": timestamp_str, "duration_ms": 312, "details": {}},
         {"agent": "load_agent", "status": "FAIL", "timestamp": timestamp_str, "duration_ms": 8420, "details": {"failures": [{"endpoint": "/api/bookings", "error": "Timeout"}]}},
         {"agent": "health_monitor", "status": "WARN", "timestamp": timestamp_str, "duration_ms": 201, "details": {"checks": []}},
     ]

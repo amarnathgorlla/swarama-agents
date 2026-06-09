@@ -20,6 +20,7 @@ import yaml
 from dotenv import load_dotenv
 
 load_dotenv(Path(__file__).resolve().parent.parent / "config" / ".env.agents")
+AGENT_SECRET = os.getenv("AGENT_SECRET")
 
 CONFIG_DIR = Path(__file__).resolve().parent.parent / "config"
 with open(CONFIG_DIR / "targets.yaml") as f:
@@ -71,16 +72,23 @@ async def run(system_state: dict | None = None, **kwargs) -> dict:
         checks.append(await _check("backend_health", client, "get", f"{BACKEND}/health"))
 
         # API routes
+        headers_base = {}
+        if AGENT_SECRET:
+            headers_base["x-agent-secret"] = AGENT_SECRET
+
         checks.append(await _check("api_services", client, "get", f"{BACKEND}/api/services",
-                                    expected_status=[200, 401]))
-        checks.append(await _check("api_bookings", client, "get", f"{BACKEND}/api/bookings",
                                     expected_status=[200, 401],
-                                    headers={"Authorization": "Bearer health-agent"}))
+                                    headers=headers_base))
+        
+        headers_with_auth = {**headers_base, "Authorization": "Bearer mock-health-agent"}
+        checks.append(await _check("api_bookings", client, "get", f"{BACKEND}/api/bookings/user/history",
+                                    expected_status=[200, 401],
+                                    headers=headers_with_auth))
         checks.append(await _check("api_mechanics_nearby", client, "get",
                                     f"{BACKEND}/api/mechanics/nearby",
                                     expected_status=[200, 401],
                                     params={"lat": "12.9716", "lng": "77.5946"},
-                                    headers={"Authorization": "Bearer health-agent"}))
+                                    headers=headers_with_auth))
 
         # Supabase connectivity
         if SUPABASE_URL and SUPABASE_KEY:

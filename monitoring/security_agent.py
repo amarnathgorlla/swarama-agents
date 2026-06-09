@@ -21,6 +21,7 @@ import yaml
 from dotenv import load_dotenv
 
 load_dotenv(Path(__file__).resolve().parent.parent / "config" / ".env.agents")
+AGENT_SECRET = os.getenv("AGENT_SECRET")
 
 CONFIG_DIR = Path(__file__).resolve().parent.parent / "config"
 with open(CONFIG_DIR / "targets.yaml") as f:
@@ -52,10 +53,13 @@ async def _test_sql_injection(client: httpx.AsyncClient) -> dict:
     vulnerabilities = []
     for payload in SQL_INJECTION_PAYLOADS:
         try:
+            headers = {"Authorization": "Bearer mock-security-agent-test"}
+            if AGENT_SECRET:
+                headers["x-agent-secret"] = AGENT_SECRET
             r = await client.post(
                 f"{BACKEND}/api/bookings",
                 json={"service_id": payload, "notes": payload},
-                headers={"Authorization": "Bearer security-agent-test"},
+                headers=headers,
                 timeout=10,
             )
             if r.status_code == 500:
@@ -79,7 +83,7 @@ async def _test_sql_injection(client: httpx.AsyncClient) -> dict:
 async def _test_unauth_access(client: httpx.AsyncClient) -> dict:
     """Access protected routes without a token — expect 401 or 403."""
     protected_routes = [
-        f"{BACKEND}/api/bookings",
+        f"{BACKEND}/api/bookings/user/history",
         f"{BACKEND}/api/mechanics/nearby",
         f"{BACKEND}/admin/stats",
     ]
@@ -121,10 +125,13 @@ async def _test_oversized_payload(client: httpx.AsyncClient) -> dict:
     oversized = {"data": "X" * (10 * 1024 * 1024)}  # 10 MB
     vulnerabilities = []
     try:
+        headers = {"Authorization": "Bearer mock-security-agent-test"}
+        if AGENT_SECRET:
+            headers["x-agent-secret"] = AGENT_SECRET
         r = await client.post(
             f"{BACKEND}/api/bookings",
             json=oversized,
-            headers={"Authorization": "Bearer security-agent-test"},
+            headers=headers,
             timeout=30,
         )
         if r.status_code == 500:

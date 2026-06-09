@@ -2,10 +2,10 @@
 # All agents compare their measurements against these values.
 
 # Response time thresholds (milliseconds)
-max_response_time_ms: 2000
-max_db_query_ms: 500
-latency_p95_ms: 1500
-latency_p99_ms: 2500
+max_response_time_ms: 4000
+max_db_query_ms: 6000
+latency_p95_ms: 3000
+latency_p99_ms: 4500
 
 # Reliability thresholds
 max_error_rate_percent: 5

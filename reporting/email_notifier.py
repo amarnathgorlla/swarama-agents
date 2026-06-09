@@ -227,6 +227,7 @@ async def run(
     report: dict | None = None,
     plain_text_summary: str | None = None,
     system_state: dict | None = None,
+    force_subject: str | None = None,
 ) -> dict:
     """
     Send an email notification based on the current system report.
@@ -276,6 +277,9 @@ async def run(
     else:  # FAIL or WARN
         subject = f"⚠️ SWARAMA — Issues detected [{ts_display}]"
         html_body = _build_fail_html(report, ts_display)
+
+    if force_subject:
+        subject = force_subject
 
     email_sent = _send_email(subject, html_body, plain_body)
 
