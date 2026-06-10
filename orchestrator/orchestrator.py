@@ -93,14 +93,11 @@ MONITORING_AGENT_MODULES = {
     "auth_agent":            "monitoring.auth_agent",
     "analytics_agent":       "monitoring.analytics_agent",
     "data_integrity_agent":  "monitoring.data_integrity_agent",
-    "chaos_agent":           "monitoring.chaos_agent",
 }
 
 ANALYSIS_AGENT_MODULES = {
     "log_analysis_agent": "analysis.log_analysis_agent",
     "root_cause_agent":   "analysis.root_cause_agent",
-    "auto_fix_agent":     "analysis.auto_fix_agent",
-    "rollback_agent":     "analysis.rollback_agent",
 }
 
 REPORTING_AGENT_MODULES = {
@@ -184,7 +181,7 @@ async def run_agents_sequential(agents: dict[str, str]) -> list[dict]:
 
 # ─── Failure handling pipeline ────────────────────────────────────────────────
 async def handle_failures(failures: list[dict]):
-    """Called when any agent returns FAIL. Runs root cause → auto fix → report."""
+    """Called when any agent returns FAIL. Runs root cause → report."""
     if not failures:
         return
 
@@ -197,13 +194,6 @@ async def handle_failures(failures: list[dict]):
         extra_kwargs={"failures": failures},
     )
 
-    # Auto fix
-    fix = await run_agent(
-        "auto_fix_agent",
-        ANALYSIS_AGENT_MODULES["auto_fix_agent"],
-        extra_kwargs={"root_cause": rca, "failures": failures},
-    )
-
     # Generate report
     await run_agent("report_agent", REPORTING_AGENT_MODULES["report_agent"])
 
@@ -212,15 +202,9 @@ async def handle_failures(failures: list[dict]):
 
 
 async def handle_critical():
-    """Called on CRITICAL failure. Triggers rollback immediately + email."""
-    logger.critical("CRITICAL failure detected — triggering rollback!")
+    """Called on CRITICAL failure. Logs warning and triggers notification email."""
+    logger.critical("CRITICAL failure detected!")
     system_state["critical"] = True
-
-    rollback = await run_agent(
-        "rollback_agent",
-        ANALYSIS_AGENT_MODULES["rollback_agent"],
-        extra_kwargs={"reason": "CRITICAL failure threshold exceeded by orchestrator"},
-    )
 
     # Forced critical email
     await run_agent(
@@ -228,8 +212,6 @@ async def handle_critical():
         REPORTING_AGENT_MODULES["email_notifier"],
         extra_kwargs={"force_subject": "🚨 CRITICAL — SWARAMA system failure"},
     )
-
-    return rollback
 
 
 # ─── Run modes ────────────────────────────────────────────────────────────────

@@ -45,7 +45,6 @@ monitoring_agents:
 analysis_agents:
   - log_analysis_agent
   - root_cause_agent
-  - auto_fix_agent
 
 # Reporting agents
 reporting_agents:

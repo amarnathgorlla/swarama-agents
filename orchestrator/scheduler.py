@@ -51,16 +51,6 @@ def start_scheduler():
     """Start APScheduler and block the main thread."""
     scheduler = BackgroundScheduler(timezone="UTC")
 
-    # Job 1: Every 2 hours — monitoring + email
-    scheduler.add_job(
-        _monitoring_job,
-        trigger=IntervalTrigger(hours=2),
-        id="monitoring_pass",
-        name="Monitoring agents pass",
-        replace_existing=True,
-        max_instances=1,
-    )
-
     # Job 2: On startup — run testing agents once
     scheduler.add_job(
         _testing_job,
@@ -81,7 +71,7 @@ def start_scheduler():
     )
 
     scheduler.start()
-    logger.info("APScheduler started. Jobs registered: monitoring (2h), testing (startup), daily (midnight)")
+    logger.info("APScheduler started. Jobs registered: testing (startup), daily (midnight)")
 
     # Keep the main thread alive
     stop_event = threading.Event()
